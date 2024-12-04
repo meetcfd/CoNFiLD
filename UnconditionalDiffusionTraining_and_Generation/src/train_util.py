@@ -33,7 +33,6 @@ class TrainLoop:
         log_interval,
         save_interval,
         resume_checkpoint,
-        valid_data=None,
         use_fp16=False,
         fp16_scale_growth=1e-3,
         schedule_sampler=None,
@@ -44,7 +43,6 @@ class TrainLoop:
         self.model = model
         self.diffusion = diffusion
         self.train_data = train_data
-        self.valid_data = valid_data
         self.batch_size = batch_size
         self.microbatch = microbatch if microbatch > 0 else batch_size
         self.lr = lr
@@ -158,9 +156,8 @@ class TrainLoop:
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps
         ):
-            train_batch, = next(self.train_data)
-            valid_batch, = next(self.valid_data)
-            self.run_step(train_batch,valid_batch, None) #self.run_step(batch, cond)
+            train_batch = next(self.train_data)
+            self.run_step(train_batch, None) #self.run_step(batch, cond)
             if self.step % self.log_interval == 0:
                 logger.dumpkvs()
             if self.step % self.save_interval == 0:
@@ -173,13 +170,11 @@ class TrainLoop:
         if (self.step - 1) % self.save_interval != 0:
             self.save()
 
-    def run_step(self, train_batch, valid_batch, cond):
+    def run_step(self, train_batch, cond):
         if cond:
             self.forward_backward(train_batch, cond[0])
-            self.forward_valid(valid_batch, cond[1])
         else:
             self.forward_backward(train_batch)
-            self.forward_valid(valid_batch)
         took_step = self.mp_trainer.optimize(self.opt)
         if took_step:
             self._update_ema()
@@ -223,36 +218,6 @@ class TrainLoop:
             )
             self.mp_trainer.backward(loss)
             
-    def forward_valid(self, batch, cond={}):
-        with th.no_grad():
-            for i in range(0, batch.shape[0], self.microbatch):
-                micro = batch[i : i + self.microbatch].to(dist_util.dev())
-                micro_cond = {
-                k: v[i : i + self.microbatch].to(dist_util.dev())
-                for k, v in cond.items()
-                }
-                last_batch = (i + self.microbatch) >= batch.shape[0]
-                t, weights = self.schedule_sampler.sample(micro.shape[0], dist_util.dev())
-
-                compute_losses = functools.partial(
-                    self.diffusion.training_losses,
-                    self.ddp_model,
-                    micro,
-                    t,
-                    model_kwargs=micro_cond,
-                    valid=True
-                )
-
-                if last_batch or not self.use_ddp:
-                    losses = compute_losses()
-                else:
-                    with self.ddp_model.no_sync():
-                        losses = compute_losses()
-
-                log_loss_dict(
-                    self.diffusion, t, {k: v * weights for k, v in losses.items()}
-                )
-
     def _update_ema(self):
         for rate, params in zip(self.ema_rate, self.ema_params):
             update_ema(params, self.mp_trainer.master_params, rate=rate)

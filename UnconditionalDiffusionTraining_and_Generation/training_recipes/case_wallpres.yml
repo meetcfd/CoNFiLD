@@ -1,0 +1,38 @@
+## inference specific args
+#model:
+
+## only inference
+# time_length : 128
+# latent_length : 128
+
+## train
+batch_size : 8
+image_size : 320
+num_channels: 128
+num_res_blocks: 2
+num_head_channels: 64
+attention_resolutions: "40"
+channel_mult: "1,   2,  4,  4"
+            # 320, 160, 80, 40
+            # 200, 100, 50, 25
+ema_path: null # from sratch
+use_film: True
+use_new_attn: True
+
+#diff:
+steps: 1000
+noise_schedule: "cosine"
+
+## train specific args
+microbatch: -1
+lr :  1.e-3
+ema_rate: "0.9999"
+log_interval: 1000
+save_interval: 10000
+lr_anneal_steps: 0
+
+log_path : wallpres_training/case1
+train_data_path: ["/home/xiantao/case/wall_pressure/bigchannel/data/to_meet/channel_180_u_y40_all_out.npy",
+                  "/home/xiantao/case/wall_pressure/bigchannel/data/to_meet/channel_180_v_y40_all_out.npy",
+                  "/home/xiantao/case/wall_pressure/bigchannel/data/to_meet/channel_180_w_y40_all_out.npy"]
+dataset: VF

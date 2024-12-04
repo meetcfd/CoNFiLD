@@ -132,7 +132,7 @@ def create_model(
     num_channels,
     num_res_blocks,
     dims=2,
-    out_channels=1,
+    out_channels=3,
     channel_mult=None,
     learn_sigma=False,
     class_cond=False,
