@@ -80,6 +80,6 @@ train_uncond_model = TrainLoop(
                                 log_interval=log_interval,
                                 save_interval=save_interval,
                                 lr_anneal_steps=lr_anneal_steps,
-                                resume_checkpoint=inp.ema_path if inp.ema_path is not None else "")
+                                resume_checkpoint=inp.model_path if inp.model_path is not None else "")
 
 train_uncond_model.run_loop()
